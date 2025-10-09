@@ -24,7 +24,7 @@ Thumbs.db
 paper_assistant.log
 
 # 输出目录
-outputs/
+# outputs/
 downloads/
 
 # IDE 配置
