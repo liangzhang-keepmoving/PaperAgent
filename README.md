@@ -73,16 +73,73 @@ python main.py analyze_from_url_download --url "https://arxiv.org/pdf/2510.06557
 - --output_dir : 下载文件和分析结果保存的目录路径（可选，默认为outputs）
 - --overwrite : 是否覆盖已存在的文件（可选，默认为False）
 
+### 5. 论文下载功能 (download)
+下载指定的学术论文到本地，支持通过URL或arXiv ID下载。
+
+**功能特点：**
+- 支持通过URL下载论文
+- 支持通过arXiv ID下载论文
+- 可选择性使用论文标题自动重命名下载的文件
+- 支持自定义下载目录
+
+**使用方法：**
+```bash
+# 通过URL下载
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1"
+
+# 通过arXiv ID下载
+python main.py download --arxiv_id "2510.06557"
+
+# 禁用使用标题重命名
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1" --no_title_rename
+
+# 指定下载目录
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1" --output_dir "./my_papers"
+```
+
+**参数说明：**
+- --url : 论文的URL链接（与--arxiv_id二选一）
+- --arxiv_id : arXiv论文ID（与--url二选一）
+- --output_dir : 下载目录路径（可选，默认为downloads）
+- --no_title_rename : 禁用使用标题重命名下载的文件
+
+### 6. Notion导入功能 (notion_import)
+将论文分析报告导入到指定的Notion页面，方便整理和查阅论文分析结果。
+
+**功能特点：**
+- 读取本地Markdown格式的论文分析报告
+- 将报告内容转换为Notion格式并添加到指定页面
+- 自动解析论文标题、摘要、研究背景等结构化内容
+- 支持配置代理设置以解决连接问题
+
+**使用方法：**
+```bash
+# 基本使用
+python main.py notion_import --report_path "/path/to/report.md"
+
+# 禁用代理
+python main.py notion_import --report_path "/path/to/report.md" --no_proxy
+```
+
+**参数说明：**
+- --report_path : 论文分析报告的Markdown文件路径（必需）
+- --api_key : Notion API密钥（可选，默认从环境变量获取）
+- --database_id : Notion数据库ID（可选，默认从环境变量获取）
+- --no_proxy : 禁用代理（解决代理连接问题）
+- --as_page : 创建独立页面而不是数据库条目
+
 ## 环境要求
 - Python 3.7+
 - 安装依赖： pip install -r requirements.txt
 - DeepSeek API密钥（需配置在.env文件中）
+- Notion API密钥（如需使用Notion导入功能）
 
 ## 注意事项
 - 确保已正确配置DeepSeek API密钥
 - 处理包含空格的文件路径时请使用引号
 - 批量分析功能会为每个论文创建单独的输出目录
 - 分析结果默认保存在outputs目录下
+- 使用Notion导入功能时，确保API密钥有效且已正确共享相关页面
 
 ## 未来计划
 - 优化论文搜索功能
