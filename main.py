@@ -9,6 +9,7 @@ DeepSeek论文助手主模块
 3. 论文下载
 4. 定时发送最新进展报告
 5. 批量分析文件夹中的所有论文
+6. 通过链接直接分析论文
 """
 
 import os
@@ -50,6 +51,17 @@ def main():
     analyze_parser.add_argument('--paper_path', type=str, required=True, help='论文文件路径')
     analyze_parser.add_argument('--output_path', type=str, help='输出Markdown文件路径')
     
+    # 通过链接下载并分析论文命令
+    analyze_url_parser = subparsers.add_parser('analyze_from_url_download', help='通过链接下载并分析论文')
+    analyze_url_parser.add_argument('--url', type=str, required=True, help='论文URL链接')
+    analyze_url_parser.add_argument('--output_dir', type=str, help='分析报告保存目录，默认为outputs')
+    analyze_url_parser.add_argument('--overwrite', action='store_true', help='是否覆盖已存在的下载文件')
+    
+    # 新增：直接从URL分析论文命令（无需下载）
+    analyze_from_url_parser = subparsers.add_parser('analyze_from_url', help='直接从URL分析论文，无需下载PDF文件')
+    analyze_from_url_parser.add_argument('--url', type=str, required=True, help='论文PDF的URL链接')
+    analyze_from_url_parser.add_argument('--output_dir', type=str, help='分析报告保存目录，默认为outputs')
+    
     # 批量分析论文命令
     batch_analyze_parser = subparsers.add_parser('batch_analyze', help='批量分析文件夹中的所有论文')
     batch_analyze_parser.add_argument('--folder_path', type=str, required=True, help='包含论文的文件夹路径')
@@ -84,6 +96,34 @@ def main():
         if args.command == 'analyze':
             from paper_analyzer import analyze_paper
             analyze_paper(args.paper_path, args.output_path)
+        # 直接从URL分析论文（无需下载）
+        elif args.command == 'analyze_from_url':
+            from paper_analyzer import analyze_paper_from_url
+            print(f'正在直接从URL分析论文: {args.url}')
+            result_path = analyze_paper_from_url(args.url, args.output_dir)
+            print(f'论文分析完成，报告已保存至: {result_path}')
+        # 从URL下载后分析论文
+        elif args.command == 'analyze_from_url_download':
+            from paper_downloader import paper_downloader
+            from paper_analyzer import analyze_paper
+            
+            print(f'正在从链接下载并分析论文: {args.url}')
+            
+            # 创建包含URL的论文信息字典
+            paper_info = {'url': args.url, 'link': args.url}
+            
+            # 下载论文 - 移除args.arxiv_id参数
+            pdf_path = paper_downloader.download_paper(args.url, output_dir=args.output_dir, overwrite=args.overwrite)
+            
+            if pdf_path:
+                print(f'论文下载成功: {pdf_path}')
+                print('开始分析论文...')
+                # 分析下载的论文
+                result_path = analyze_paper(pdf_path, args.output_dir)
+                print(f'论文分析完成，报告已保存至: {result_path}')
+            else:
+                print('论文下载失败，无法进行分析')
+                sys.exit(1)
         elif args.command == 'batch_analyze':
             from paper_analyzer import batch_analyze_papers
             print(f'开始批量分析文件夹: {args.folder_path}')
@@ -155,7 +195,6 @@ def main():
     except Exception as e:
         logger.error(f'执行命令时出错: {str(e)}')
         sys.exit(1)
-
 
 if __name__ == '__main__':
     main()

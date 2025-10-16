@@ -17,7 +17,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from utils.web_utils import get_webdriver, download_file, get_page_content
+# 修改导入语句，使用正确的函数名
+from utils.web_utils import setup_webdriver, download_file, fetch_url_content
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -54,7 +55,8 @@ class PaperDownloader:
     def _init_driver(self):
         """初始化Selenium WebDriver"""
         if not self.driver:
-            self.driver = get_webdriver(download_dir=self.download_dir)
+            # 使用setup_webdriver替代get_webdriver
+            self.driver = setup_webdriver()
     
     def _sanitize_filename(self, filename):
         """
@@ -377,6 +379,57 @@ class PaperDownloader:
 
 # 单例模式实例
 paper_downloader = PaperDownloader()
+
+# 在paper_downloader.py文件底部添加一个新方法，以支持main.py中的直接调用
+
+# 在文件末尾添加以下内容
+# 下载论文的便捷方法，适配命令行接口
+def download_paper(url=None, arxiv_id=None, output_dir=None, overwrite=False):
+    """
+    下载论文的便捷方法，适配命令行接口
+    
+    Args:
+        url: 论文URL
+        arxiv_id: arXiv论文ID
+        output_dir: 下载目录
+        overwrite: 是否覆盖已存在的文件
+        
+    Returns:
+        str: 下载文件的路径，如果下载失败则返回None
+    """
+    # 如果提供了output_dir，创建新的下载器实例
+    if output_dir:
+        downloader = PaperDownloader(download_dir=output_dir)
+    else:
+        downloader = paper_downloader
+    
+    # 创建论文信息字典
+    paper_info = {}
+    
+    # 如果提供了URL
+    if url:
+        paper_info['link'] = url
+        paper_info['url'] = url
+        if 'arxiv.org' in url:
+            paper_info['source'] = 'arxiv'
+        
+        # 尝试下载
+        result = downloader.download_from_url(url, overwrite=overwrite)
+        if result:
+            return result
+        
+        # 如果直接URL下载失败，尝试使用完整的download_paper方法
+        return downloader.download_paper(paper_info, overwrite=overwrite)
+    
+    # 如果提供了arXiv ID
+    elif arxiv_id:
+        return downloader.download_from_arxiv(arxiv_id, overwrite=overwrite)
+    
+    logger.error("必须提供URL或arXiv ID")
+    return None
+
+# 为已有的paper_downloader实例添加这个方法
+paper_downloader.download_paper = download_paper
 
 if __name__ == "__main__":
     # 测试代码

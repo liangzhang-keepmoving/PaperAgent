@@ -13,12 +13,69 @@ import os
 import logging
 import pdfplumber
 import io
-import os
 import re
+import requests  # 添加requests库导入
 from PIL import Image
+from utils.web_utils import DEFAULT_HEADERS  # 导入默认请求头
 
 # 设置日志
 logger = logging.getLogger(__name__)
+
+# 添加新函数：从URL直接提取PDF内容
+def extract_text_from_pdf_url(pdf_url, max_pages=None):
+    """
+    从URL直接提取PDF文本内容，无需下载保存文件
+    
+    Args:
+        pdf_url: PDF文件的URL链接
+        max_pages: 最大处理页数，None表示处理所有页面
+        
+    Returns:
+        提取的文本内容字符串
+    """
+    try:
+        logger.info(f'开始从URL获取PDF内容: {pdf_url}')
+        
+        # 发送请求获取PDF内容
+        session = requests.Session()
+        session.headers.update(DEFAULT_HEADERS)
+        response = session.get(pdf_url, stream=True)
+        response.raise_for_status()  # 如果状态码不是200，抛出异常
+        
+        # 将响应内容转换为字节流
+        pdf_bytes = io.BytesIO(response.content)
+        logger.info(f'成功获取PDF内容，大小: {len(response.content)/1024/1024:.2f}MB')
+        
+        text = []
+        with pdfplumber.open(pdf_bytes) as pdf:
+            # 确定要处理的页面范围
+            pages_to_process = pdf.pages
+            if max_pages and max_pages < len(pages_to_process):
+                pages_to_process = pages_to_process[:max_pages]
+                logger.info(f'限制处理页数为: {max_pages}')
+            
+            # 提取每一页的文本
+            for i, page in enumerate(pages_to_process):
+                page_text = page.extract_text()
+                if page_text:
+                    text.append(page_text)
+                
+                # 记录进度
+                if (i + 1) % 10 == 0 or (i + 1) == len(pages_to_process):
+                    logger.info(f'已处理第 {i+1}/{len(pages_to_process)} 页')
+        
+        # 将所有页面的文本合并
+        full_text = '\n\n'.join(text)
+        logger.info(f'从PDF URL中提取文本完成，总字符数: {len(full_text)}')
+        
+        return full_text
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f'获取PDF URL内容失败: {str(e)}')
+        raise
+    except Exception as e:
+        logger.error(f'提取PDF URL文本时出错: {str(e)}')
+        raise
 
 
 def extract_text_from_pdf(pdf_path, max_pages=None):

@@ -16,7 +16,7 @@ import logging
 import re
 from datetime import datetime
 
-from utils.pdf_utils import extract_text_from_pdf
+from utils.pdf_utils import extract_text_from_pdf, extract_text_from_pdf_url  # 导入新函数
 from utils.markdown_utils import save_markdown_report
 from deepseek_api import deepseek_client
 
@@ -224,6 +224,63 @@ def extract_paper_title(paper_content):
     except Exception as e:
         logger.error(f'提取论文标题时出错: {str(e)}')
         return '未知论文标题'
+
+
+# 添加新函数：从URL直接分析论文
+def analyze_paper_from_url(pdf_url, output_dir=None):
+    """
+    从URL直接分析论文并生成报告，无需下载PDF文件
+    
+    Args:
+        pdf_url: 论文PDF的URL链接
+        output_dir: 报告保存目录，默认为outputs/论文标题
+    
+    Returns:
+        保存的报告文件路径
+    """
+    try:
+        logger.info(f'开始分析论文URL: {pdf_url}')
+        
+        # 直接从URL提取论文文本内容
+        paper_content = extract_text_from_pdf_url(pdf_url)
+        
+        # 提取论文标题
+        paper_title = extract_paper_title(paper_content)
+        logger.info(f'提取到论文标题: {paper_title}')
+        
+        # 清理标题中的特殊字符
+        clean_title = re.sub(r'[\\/:*?"<>|]', '_', paper_title)[:50]
+        
+        # 确定输出目录
+        if not output_dir:
+            output_dir = os.path.join('outputs', clean_title)
+        else:
+            # 如果提供了output_dir，仍然创建以论文标题命名的子目录
+            output_dir = os.path.join(output_dir, clean_title)
+        
+        # 确保输出目录存在
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 调用DeepSeek API分析论文
+        logger.info('调用DeepSeek API分析论文内容')
+        analysis_result = analyze_paper_content(paper_content)
+        
+        # 构建完整报告
+        full_report = analysis_result
+        
+        # 生成输出文件名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_file = os.path.join(output_dir, f'{clean_title}_{timestamp}_分析报告.md')
+        
+        # 保存报告
+        save_path = save_markdown_report(full_report, output_file)
+        
+        logger.info(f'论文分析完成，报告已保存至: {save_path}')
+        return save_path
+        
+    except Exception as e:
+        logger.error(f'分析论文URL时出错: {str(e)}')
+        raise
 
 
 
