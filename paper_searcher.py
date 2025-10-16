@@ -19,7 +19,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from utils.web_utils import get_webdriver, download_file, get_page_content
+# 修改导入语句
+from utils.web_utils import setup_webdriver, download_file, fetch_url_content
 # 导入大模型API模块
 from deepseek_api import DeepSeekAPI
 
@@ -62,10 +63,11 @@ class PaperSearcher:
             except Exception as e:
                 logger.error(f"关闭WebDriver失败: {str(e)}")
     
+    # 在PaperSearcher类中修改_init_driver方法
     def _init_driver(self):
         """初始化Selenium WebDriver"""
         if not self.driver:
-            self.driver = get_webdriver()
+            self.driver = setup_webdriver()  # 从get_webdriver改为setup_webdriver
     
     def _init_deepseek_client(self):
         """初始化DeepSeek API客户端"""
@@ -163,6 +165,7 @@ class PaperSearcher:
             logger.error(f"Semantic Scholar搜索失败: {str(e)}")
             return []
     
+    # 修改arXiv搜索函数中的get_page_content调用
     def search_arxiv(self, query, max_results=20, sort_by="relevance"):
         """
         在arXiv上搜索论文
@@ -176,14 +179,13 @@ class PaperSearcher:
             list: 论文信息列表
         """
         try:
-            # 构建搜索URL
-            sort_param = "relevance" if sort_by == "relevance" else "submittedDateDesc"
-            search_url = f"{self.arxiv_url}/search/?query={requests.utils.quote(query)}&searchtype=all&source=header&order={sort_param}&size={max_results}"
+            # 使用arXiv标准搜索路径格式
+            search_url = f"{self.arxiv_url}/search_query?searchtype=all&query={requests.utils.quote(query)}"
             
             logger.info(f"在arXiv上搜索: {query}")
             
-            # 获取页面内容
-            content = get_page_content(search_url)
+            # 尝试使用Selenium获取页面内容，以避免被阻止
+            content = fetch_url_content(search_url, use_selenium=True)  # 启用Selenium
             if not content:
                 return []
             
@@ -233,6 +235,7 @@ class PaperSearcher:
             logger.error(f"arXiv搜索失败: {str(e)}")
             return []
     
+    # 修改dblp搜索函数中的get_page_content调用
     def search_dblp(self, query, max_results=20, sort_by="relevance"):
         """
         在dblp上搜索论文
@@ -252,7 +255,7 @@ class PaperSearcher:
             logger.info(f"在dblp上搜索: {query}")
             
             # 获取页面内容
-            content = get_page_content(search_url)
+            content = fetch_url_content(search_url)  # 从get_page_content改为fetch_url_content
             if not content:
                 return []
             

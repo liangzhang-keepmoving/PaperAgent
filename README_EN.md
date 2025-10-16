@@ -73,20 +73,76 @@ python main.py analyze_from_url_download --url "https://arxiv.org/pdf/2510.06557
 - --output_dir: Path to the directory where downloaded files and analysis results will be saved (optional, defaults to outputs)
 - --overwrite: Whether to overwrite existing files (optional, defaults to False)
 
+### 5. Paper Download (download)
+Download specified academic papers to local storage, supporting downloads via URL or arXiv ID.
+
+**Features:**
+- Support downloading papers via URL
+- Support downloading papers via arXiv ID
+- Optionally automatically rename downloaded files using paper titles
+- Support custom download directories
+
+**Usage:**
+```bash
+# Download via URL
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1"
+
+# Download via arXiv ID
+python main.py download --arxiv_id "2510.06557"
+
+# Disable title renaming
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1" --no_title_rename
+
+# Specify download directory
+python main.py download --url "https://arxiv.org/pdf/2510.06557v1" --output_dir "./my_papers"
+```
+
+**Parameter Description:**
+- --url: URL link to the paper (either --url or --arxiv_id is required)
+- --arxiv_id: arXiv paper ID (either --url or --arxiv_id is required)
+- --output_dir: Path to the download directory (optional, defaults to downloads)
+- --no_title_rename: Disable automatic renaming of downloaded files using paper titles
+
+### 6. Notion Import (notion_import)
+Import paper analysis reports to a specified Notion page for easy organization and reference of paper analysis results.
+
+**Features:**
+- Read local Markdown format paper analysis reports
+- Convert report content to Notion format and add to the specified page
+- Automatically parse structured content such as paper title, abstract, research background, etc.
+- Support proxy configuration to solve connection issues
+
+**Usage:**
+```bash
+# Basic usage
+python main.py notion_import --report_path "/path/to/report.md"
+
+# Disable proxy
+python main.py notion_import --report_path "/path/to/report.md" --no_proxy
+```
+
+**Parameter Description:**
+- --report_path: Path to the paper analysis report in Markdown format (required)
+- --api_key: Notion API key (optional, defaults to value from environment variables)
+- --database_id: Notion database ID (optional, defaults to value from environment variables)
+- --no_proxy: Disable proxy (to resolve proxy connection issues)
+- --as_page: Create a standalone page instead of a database entry
+
 ## Environment Requirements
 - Python 3.7+
 - Install dependencies: `pip install -r requirements.txt`
 - DeepSeek API key (needs to be configured in the .env file)
+- Notion API key (for using Notion import functionality)
 
 ## Notes
 - Ensure the DeepSeek API key is correctly configured
 - Use quotes when handling file paths containing spaces
 - The batch analysis feature will create a separate output directory for each paper
 - Analysis results are saved in the outputs directory by default
+- When using the Notion import functionality, ensure the API key is valid and has been correctly shared with relevant pages
 
 ## Future Plans
-- Add paper search functionality
-- Implement paper download functionality
-- Add report generation functionality
+- Optimize paper search functionality
+- Improve report generation functionality
 
 Hope this tool helps you read and analyze academic papers more efficiently!

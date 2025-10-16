@@ -257,3 +257,69 @@ def extract_images_from_pdf(pdf_path, output_dir=None, fig_patterns=None):
     except Exception as e:
         logger.error(f'提取PDF图片时出错: {str(e)}')
         raise
+
+
+def extract_paper_title(pdf_path, max_lines=10):
+    """
+    从PDF文件中提取论文标题
+    
+    Args:
+        pdf_path: PDF文件路径
+        max_lines: 检查前几行来寻找标题
+        
+    Returns:
+        提取的论文标题字符串，如果无法提取则返回None
+    """
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if not pdf.pages:
+                logger.warning(f'PDF文件没有页面: {pdf_path}')
+                return None
+            
+            # 获取第一页文本
+            first_page = pdf.pages[0]
+            page_text = first_page.extract_text()
+            
+            if not page_text:
+                logger.warning(f'无法从PDF中提取文本: {pdf_path}')
+                return None
+            
+            # 分割文本为行
+            lines = page_text.strip().split('\n')
+            # 过滤空行
+            lines = [line.strip() for line in lines if line.strip()]
+            
+            # 检查前几行，尝试找到标题
+            # 标题通常是第一页中较长且格式特殊的行
+            title_candidates = []
+            for i, line in enumerate(lines[:max_lines]):
+                # 标题特征：长度适中，包含多个单词，不包含数字或年份
+                # 跳过明显是作者信息的行（通常包含and或多个逗号）
+                if ' and ' in line.lower() or line.count(',') > 2:
+                    continue
+                
+                # 跳过太短或太长的行
+                words = line.split()
+                if 2 <= len(words) <= 50:
+                    # 检查是否可能是标题（通常首字母大写）
+                    if sum(1 for word in words if word[0].isupper()) / len(words) > 0.5:
+                        title_candidates.append((i, line))
+            
+            # 如果找到候选标题，返回最前面的一个
+            if title_candidates:
+                # 按位置排序，选择最前面的候选标题
+                title_candidates.sort(key=lambda x: x[0])
+                title = title_candidates[0][1]
+                logger.info(f'成功提取论文标题: {title}')
+                return title
+            
+            # 如果没有找到明显的标题，返回第一行非空行
+            elif lines:
+                logger.info(f'未找到明确的标题，使用第一行: {lines[0]}')
+                return lines[0]
+            
+            return None
+            
+    except Exception as e:
+        logger.error(f'提取PDF标题时出错: {str(e)}')
+        return None

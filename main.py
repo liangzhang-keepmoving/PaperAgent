@@ -79,6 +79,7 @@ def main():
     download_parser.add_argument('--url', type=str, help='论文URL')
     download_parser.add_argument('--arxiv_id', type=str, help='arXiv论文ID')
     download_parser.add_argument('--output_dir', type=str, help='下载目录')
+    download_parser.add_argument('--no_title_rename', action='store_true', help='禁用使用标题重命名文件')
     
     # 启动定时报告命令
     report_parser = subparsers.add_parser('report', help='启动定时报告服务')
@@ -86,6 +87,15 @@ def main():
     report_parser.add_argument('--frequency', type=str, choices=['daily', 'weekly', 'monthly'], 
                               default='weekly', help='报告频率')
     
+    # Notion导入命令
+    notion_parser = subparsers.add_parser('notion_import', help='将论文分析报告导入到Notion')
+    notion_parser.add_argument('--report_path', type=str, required=True, help='论文分析报告的Markdown文件路径')
+    notion_parser.add_argument('--api_key', type=str, help='Notion API密钥（可选，默认从环境变量获取）')
+    notion_parser.add_argument('--database_id', type=str, help='Notion数据库ID（可选，默认从环境变量获取）')
+    notion_parser.add_argument('--no_proxy', action='store_true', help='禁用代理（解决代理连接问题）')
+    notion_parser.add_argument('--as_page', action='store_true', help='创建独立页面而不是数据库条目')
+    
+    # 解析命令行参数
     args = parser.parse_args()
     
     if not args.command:
@@ -147,8 +157,21 @@ def main():
                 print(f"   Link: {paper.get('link', 'No link')}")
                 print()
         elif args.command == 'download':
-            from paper_downloader import paper_downloader
-            paper_downloader.download_paper(args.url, args.arxiv_id, args.output_dir)
+            from paper_downloader import PaperDownloader
+            
+            # 设置下载目录
+            output_dir = args.output_dir or DOWNLOAD_DIR
+            downloader = PaperDownloader(download_dir=output_dir)
+            
+            # 是否使用标题重命名
+            use_title_as_name = not args.no_title_rename
+            
+            if args.url:
+                downloader.download_from_url(args.url, use_title_as_name=use_title_as_name)
+            elif args.arxiv_id:
+                downloader.download_from_arxiv(args.arxiv_id, use_title_as_name=use_title_as_name)
+            else:
+                logger.error("请提供--url或--arxiv_id参数")
         elif args.command == 'report':
             from report_scheduler import report_scheduler
             import time
@@ -192,6 +215,23 @@ def main():
                 print("正在关闭服务...")
                 report_scheduler.remove_job(job_id)
                 print("服务已关闭")
+        # 添加notion_import命令处理逻辑
+        elif args.command == 'notion_import':
+            from notion_integration import import_paper_report_to_notion
+            try:
+                print(f"正在导入论文分析报告到 Notion: {args.report_path}")
+                # 调用导入函数
+                page_url = import_paper_report_to_notion(
+                    markdown_file_path=args.report_path,
+                    api_key=args.api_key,
+                    database_id=args.database_id,
+                    use_proxy=not args.no_proxy,
+                    as_page=args.as_page
+                )
+                print(f"导入成功！页面 URL: {page_url}")
+            except Exception as e:
+                logger.error(f"执行命令时出错: {str(e)}")
+                sys.exit(1)
     except Exception as e:
         logger.error(f'执行命令时出错: {str(e)}')
         sys.exit(1)

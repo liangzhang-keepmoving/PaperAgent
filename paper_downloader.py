@@ -17,8 +17,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
-# 修改导入语句，使用正确的函数名
-from utils.web_utils import setup_webdriver, download_file, fetch_url_content
+from utils.pdf_utils import extract_paper_title  # 添加导入
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -78,16 +77,17 @@ class PaperDownloader:
             filename = name[:max_length - len(ext)] + ext
         return filename
     
-    def download_from_url(self, url, filename=None, overwrite=False, max_retries=3):
+    def download_from_url(self, url, filename=None, overwrite=False, max_retries=3, use_title_as_name=True):
         """
-        从URL下载论文文件
+        从URL下载论文文件，并可选使用论文标题重命名
         
         Args:
             url: 论文下载链接
             filename: 保存的文件名，如果为None则从URL推断
             overwrite: 是否覆盖已存在的文件
             max_retries: 最大重试次数
-        
+            use_title_as_name: 是否使用论文标题作为文件名
+            
         Returns:
             str: 下载文件的路径，如果下载失败则返回None
         """
@@ -119,6 +119,11 @@ class PaperDownloader:
         # 检查文件是否已存在
         if os.path.exists(save_path) and not overwrite:
             logger.info(f"文件已存在，跳过下载: {save_path}")
+            
+            # 即使文件已存在，如果启用了使用标题重命名且文件名不是标题，也尝试重命名
+            if use_title_as_name and not (filename.startswith('title_') or 'paper_' in filename):
+                self._rename_file_with_title(save_path)
+            
             return save_path
         
         # 尝试下载
@@ -132,6 +137,13 @@ class PaperDownloader:
                 
                 if result and os.path.exists(save_path) and os.path.getsize(save_path) > 0:
                     logger.info(f"论文下载成功: {save_path}")
+                    
+                    # 下载成功后，如果启用了使用标题重命名，则尝试用论文标题重命名
+                    if use_title_as_name:
+                        new_path = self._rename_file_with_title(save_path)
+                        if new_path:
+                            return new_path
+                    
                     return save_path
                 else:
                     logger.warning(f"下载失败，文件可能为空: {save_path}")
@@ -149,14 +161,63 @@ class PaperDownloader:
         logger.error(f"达到最大重试次数，下载失败: {url}")
         return None
     
-    def download_from_arxiv(self, arxiv_id, overwrite=False):
+    # 添加新的辅助方法：使用论文标题重命名文件
+    def _rename_file_with_title(self, file_path):
+        """
+        尝试从PDF文件中提取标题并重命名文件
+        
+        Args:
+            file_path: PDF文件路径
+            
+        Returns:
+            str: 重命名后的文件路径，如果重命名失败则返回原路径
+        """
+        try:
+            # 提取论文标题
+            title = extract_paper_title(file_path)
+            
+            if title:
+                # 生成新文件名
+                new_filename = self._sanitize_filename(f"{title}.pdf")
+                
+                # 构建新的文件路径
+                dir_path = os.path.dirname(file_path)
+                new_path = os.path.join(dir_path, new_filename)
+                
+                # 如果新文件名与原文件名不同，则重命名
+                if new_path != file_path:
+                    # 检查新文件是否已存在
+                    counter = 1
+                    base_name, ext = os.path.splitext(new_filename)
+                    while os.path.exists(new_path):
+                        # 如果文件已存在，添加计数器
+                        new_filename = f"{base_name}_{counter}{ext}"
+                        new_path = os.path.join(dir_path, new_filename)
+                        counter += 1
+                    
+                    # 执行重命名
+                    os.rename(file_path, new_path)
+                    logger.info(f"文件已重命名为: {new_filename}")
+                    return new_path
+                else:
+                    logger.info(f"文件名已是标题，无需重命名: {os.path.basename(file_path)}")
+            else:
+                logger.warning(f"无法从PDF中提取标题: {file_path}")
+                
+        except Exception as e:
+            logger.error(f"重命名文件时出错: {str(e)}")
+            
+        return file_path
+    
+    def download_from_arxiv(self, arxiv_id, overwrite=False, use_title_as_name=True):
         """
         从arXiv下载论文
         
         Args:
             arxiv_id: arXiv论文ID
             overwrite: 是否覆盖已存在的文件
-        
+            use_title_as_name: 是否使用论文标题作为文件名
+            
         Returns:
             str: 下载文件的路径，如果下载失败则返回None
         """
@@ -164,11 +225,12 @@ class PaperDownloader:
             # 构建下载链接
             arxiv_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
             
-            # 构建文件名
-            filename = f"arxiv_{arxiv_id}.pdf"
+            # 构建临时文件名
+            temp_filename = f"arxiv_{arxiv_id}.pdf"
             
             logger.info(f"从arXiv下载论文: {arxiv_id}")
-            return self.download_from_url(arxiv_url, filename, overwrite)
+            # 调用download_from_url并启用标题重命名
+            return self.download_from_url(arxiv_url, temp_filename, overwrite, use_title_as_name=use_title_as_name)
             
         except Exception as e:
             logger.error(f"从arXiv下载论文失败: {str(e)}")
@@ -251,7 +313,7 @@ class PaperDownloader:
             logger.error(f"从Google Scholar下载论文失败: {str(e)}")
             return None
     
-    def download_paper(self, paper_info, overwrite=False, prefer_direct=False):
+    def download_paper(self, paper_info, overwrite=False, prefer_direct=False, use_title_as_name=True):
         """
         下载论文，尝试多种方法
         
@@ -259,6 +321,7 @@ class PaperDownloader:
             paper_info: 论文信息字典
             overwrite: 是否覆盖已存在的文件
             prefer_direct: 是否优先使用直接下载链接
+            use_title_as_name: 是否使用论文标题作为文件名
         
         Returns:
             str: 下载文件的路径，如果下载失败则返回None
@@ -276,26 +339,29 @@ class PaperDownloader:
             arxiv_match = re.search(r'arxiv\.org/abs/(\d+\.\d+v?\d*)', link)
             if arxiv_match:
                 arxiv_id = arxiv_match.group(1)
-                result = self.download_from_arxiv(arxiv_id, overwrite)
+                result = self.download_from_arxiv(arxiv_id, overwrite, use_title_as_name=use_title_as_name)
                 if result:
                     return result
         
         # 检查链接是否已经是PDF链接
         if prefer_direct and link and link.lower().endswith('.pdf'):
-            # 构建文件名
+            # 如果有标题信息，可以直接使用
             filename = None
-            if title:
+            if title and not use_title_as_name:  # 注意：如果use_title_as_name为True，将在下载后处理
                 filename = f"{title[:100]}.pdf"
             
-            result = self.download_from_url(link, filename, overwrite)
+            result = self.download_from_url(link, filename, overwrite, use_title_as_name=use_title_as_name)
             if result:
                 return result
         
         # 尝试从Google Scholar下载（如果适用）
         if source.lower() == "google scholar" or "scholar.google" in link.lower():
+            # Google Scholar方法可能已经使用标题，这里保持原样
             result = self.download_from_google_scholar(paper_info, overwrite)
-            if result:
-                return result
+            if result and use_title_as_name:
+                # 确保使用标题重命名
+                return self._rename_file_with_title(result)
+            return result
         
         # 尝试直接访问链接并查找PDF
         if link:
